@@ -9,6 +9,8 @@ import boto3
 import ruyaml
 from pyfzf.pyfzf import FzfPrompt
 
+CMD_END = ";"
+
 ACTIONS = {
     "assume": "Assume the role in the current shell",
     "browser": "Open browser to the switch role URL",
@@ -49,11 +51,11 @@ def generate_session_credentials_commands(sts_client, role_arn, session_name, du
     if external_id:
         kwargs["ExternalId"] = external_id
     credentials = sts_client.assume_role(**kwargs)["Credentials"]
-    return "\n".join(
+    return CMD_END.join(
         [
-            f'export AWS_ACCESS_KEY_ID={credentials["AccessKeyId"]}',
-            f'export AWS_SECRET_ACCESS_KEY={credentials["SecretAccessKey"]}',
-            f'export AWS_SESSION_TOKEN={credentials["SessionToken"]}',
+            f'export AWS_ACCESS_KEY_ID="{credentials["AccessKeyId"]}"',
+            f'export AWS_SECRET_ACCESS_KEY="{credentials["SecretAccessKey"]}"',
+            f'export AWS_SESSION_TOKEN="{credentials["SessionToken"]}"',
         ]
     )
 
@@ -76,14 +78,14 @@ def choose_role_name(role_map, account_id):
     return choice[0]
 
 
-def choose_action(args):
-    passed_actions = [getattr(args, action) for action in ACTIONS.keys()]
-    if any(passed_actions):
-        return [action for action in passed_actions if action][0]
+def choose_actions(args):
+    passed_actions = [action for action in ACTIONS.keys() if getattr(args, action)]
+    if passed_actions:
+        return passed_actions
     fzf = FzfPrompt()
     choices = dict([(f"{action}\t{help}", action) for action, help in ACTIONS.items()])
-    choice = fzf.prompt(choices)
-    return choices[choice[0]]
+    chosen = fzf.prompt(choices, "--multi")
+    return [choices[choice] for choice in chosen]
 
 
 def main(config, args):
@@ -103,16 +105,11 @@ def main(config, args):
     )
     role_arn = generate_role_arn(account_id=account_id, role_name=role_name)
     url = generate_url(role_name=role_name, account_id=account_id, display_name=account["DisplayName"])
-    action = choose_action(args)
+    actions = choose_actions(args)
 
-    if action == "url":
-        print(f"echo '{url}'")
-    elif action == "browser":
-        print(f"echo opening browser to '{url}'")
-        webbrowser.open(url)
-    elif action == "role":
-        print(f"echo '{role_arn}'")
-    elif action == "assume":
+    if not actions:
+        raise Exception(f"Oh dang this should never happen, action is {actions}")
+    if "assume" in actions:
         session_name = config.get("role_session_name") or generate_session_name(sts_client=sts_client) or "awslaunch"
         session_credentials_commands = generate_session_credentials_commands(
             sts_client=sts_client,
@@ -120,9 +117,15 @@ def main(config, args):
             session_name=session_name,
             duration_hours=config.get("duration_hours", 1),
         )
-        print(session_credentials_commands)
-    else:
-        raise Exception("Oh dang this should never happen")
+        print(session_credentials_commands, end=CMD_END)
+    if "browser" in actions:
+        print(f"echo opening browser to '{url}'", end=CMD_END)
+        webbrowser.open(url)
+    if "url" in actions:
+        print(f"echo '{url}'", end=CMD_END)
+    if "role" in actions:
+        print(f"echo '{role_arn}'", end=CMD_END)
+    print()
     return 0
 
 
