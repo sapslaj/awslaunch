@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "awslaunch configuration",
+  "type": "object",
+  "required": [
+    "version"
+  ],
+  "properties": {
+    "version": {
+      "type": "number",
+      "description": "config file version",
+      "minimum": 0.1,
+      "maximum": 0.1
+    },
+    "duration_hours": {
+      "type": "integer"
+    },
+    "source_profile": {
+      "type": "string"
+    },
+    "roles": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^([0-9]+|_)$"
+      },
+      "patternProperties": {
+        ".*": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "account_display_names": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[0-9]+$"
+      },
+      "patternProperties": {
+        ".*": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

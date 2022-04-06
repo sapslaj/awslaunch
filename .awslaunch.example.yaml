@@ -1,0 +1,25 @@
+version: 0.1
+
+# Session duration in hours. Not using seconds because hours is easier to grok.
+duration_hours: 1
+
+# This profile is used to fetch the accounts from AWS Organizations as well as assume roles.
+source_profile: org-admin
+
+# This maps account IDs to the available roles.
+roles:
+  # "_" is the default list for all accounts
+  _:
+    - OrganizationAccountAccessRole
+
+  # Set the roles per account ID
+  123456789012:
+    - OrganizationAccountAccessRole
+    - DevAccessRole
+  987654321098:
+    - OrganizationAccountAccessRole
+    - AdminAccessRole
+
+# Defaults to the name in the organization list
+account_display_names:
+  123456789012: main
