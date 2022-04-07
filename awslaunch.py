@@ -78,6 +78,14 @@ def generate_session_credentials_commands(sts_client, role_arn, session_name, du
     ]
 
 
+def generate_unset_credentials_commands():
+    return [
+        f"unset AWS_ACCESS_KEY_ID",
+        f"unset AWS_SECRET_ACCESS_KEY",
+        f"unset AWS_SESSION_TOKEN",
+    ]
+
+
 def generate_save_profile_name(account_display_name, role_name):
     return re.sub(r"[!@#$%^&\*\(\)\[\]\{\};:\,\./<>\?\|`~=_+ ]", "-", f"{account_display_name}-{role_name}".lower())
 
@@ -133,8 +141,11 @@ def save_profile(source_profile, role_arn, session_name, profile_name):
         aws_config.write(f)
 
 
-
 def main(config, args):
+    if args.clear:
+        [cmd(c) for c in generate_unset_credentials_commands()]
+        msg("session environment variables cleared.")
+        return 0
     source_profile = args.source_profile or config.get("source_profile", "default")
     source_session = boto3.Session(profile_name=source_profile)
     organizations_profile = args.organizations_profile or config.get("organizations_profile", source_profile)
@@ -181,7 +192,9 @@ def main(config, args):
         msg(f"Account name: {account_display_name}")
         msg(f"Role ARN: {role_arn}")
         msg(f"Role Session Name: {session_name}")
-        default_save_profile_name = generate_save_profile_name(account_display_name=account_display_name, role_name=role_name)
+        default_save_profile_name = generate_save_profile_name(
+            account_display_name=account_display_name, role_name=role_name
+        )
         save_profile_name = choose_save_profile_name(args=args, default=default_save_profile_name)
         msg(f"Profile Name: {save_profile_name}")
         save_profile(
@@ -201,6 +214,12 @@ if __name__ == "__main__":
     parser.add_argument("--help", "-h", action="store_true", help="show this help message and exit")
     for action, help in ACTIONS.items():
         parser.add_argument(f"--{action}", f"-{action[0]}", action="store_true", help=help)
+    parser.add_argument(
+        "--clear",
+        "-c",
+        action="store_true",
+        help="Clear environment variables set by --assume and exit.",
+    )
     parser.add_argument(
         "--external-id",
         required=False,
