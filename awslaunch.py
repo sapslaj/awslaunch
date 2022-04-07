@@ -90,34 +90,39 @@ def choose_actions(args):
 
 def main(config, args):
     source_profile = args.source_profile or config.get("source_profile", "default")
-    session = boto3.Session(profile_name=source_profile)
-    organizations_client = session.client("organizations")
-    sts_client = session.client("sts")
+    source_session = boto3.Session(profile_name=source_profile)
+    organizations_profile = args.organizations_profile or config.get("organizations_profile", source_profile)
+    organizations_session = boto3.Session(profile_name=organizations_profile)
+    organizations_client = organizations_session.client("organizations")
+    sts_client = source_session.client("sts")
 
     account_choices = generate_account_choices(
         account_display_names=config.get("account_display_names", {}), organizations_client=organizations_client
     )
     account = choose_account(account_choices=account_choices, account_id=args.account_id)
     account_id = account["Id"]
+    account_display_name = account["DisplayName"]
     role_name = args.role_name or choose_role_name(
         account_id=account_id,
         role_map=config.get("roles", {}),
     )
     role_arn = generate_role_arn(account_id=account_id, role_name=role_name)
-    url = generate_url(role_name=role_name, account_id=account_id, display_name=account["DisplayName"])
+    url = generate_url(role_name=role_name, account_id=account_id, display_name=account_display_name)
     actions = choose_actions(args)
 
     if not actions:
         raise Exception(f"Oh dang this should never happen, action is {actions}")
     if "assume" in actions:
         session_name = config.get("role_session_name") or generate_session_name(sts_client=sts_client) or "awslaunch"
+        duration_hours = int(args.duration_hours or config.get("duration_hours", 1))
         session_credentials_commands = generate_session_credentials_commands(
             sts_client=sts_client,
             role_arn=role_arn,
             session_name=session_name,
-            duration_hours=config.get("duration_hours", 1),
+            duration_hours=duration_hours,
         )
         print(session_credentials_commands, end=CMD_END)
+        print(f"echo '{role_arn}' from '{account_display_name}' assumed.", end=CMD_END)
     if "browser" in actions:
         print(f"echo opening browser to '{url}'", end=CMD_END)
         webbrowser.open(url)
@@ -142,7 +147,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--role-name", required=False, default=None, help="Pass the role name explicitly")
     parser.add_argument("--account-id", required=False, default=None, help="Pass the account ID explicitly")
-    parser.add_argument("--source-profile", required=False, default=None, help="Source AWS profile to source")
+    parser.add_argument("--duration-hours", required=False, default=None, help="Session duration in hours")
+    parser.add_argument("--organizations-profile", required=False, default=None, help="AWS profile to use when gathering AWS organizations information")
+    parser.add_argument("--source-profile", required=False, default=None, help="AWS profile to use when assuming a role")
 
     args = parser.parse_args()
     if args.help:

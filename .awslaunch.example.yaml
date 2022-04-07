@@ -1,10 +1,13 @@
-version: 0.1
+version: 0.2
 
 # Session duration in hours. Not using seconds because hours is easier to grok.
 duration_hours: 1
 
-# This profile is used to fetch the accounts from AWS Organizations as well as assume roles.
-source_profile: org-admin
+# This profile is used to fetch the accounts from AWS Organizations
+organizations_profile: org-admin
+
+# This profile is used to assume roles.
+source_profile: org-mfa
 
 # This maps account IDs to the available roles.
 roles:
