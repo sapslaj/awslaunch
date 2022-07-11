@@ -34,9 +34,10 @@ def msg(*s):
 
 
 def generate_account_choices(account_display_names, organizations_client):
+    paginator = organizations_client.get_paginator("list_accounts")
     accounts = [
         account | {"DisplayName": account_display_names.get(int(account["Id"]), account["Name"])}
-        for account in organizations_client.list_accounts()["Accounts"]
+        for page in paginator.paginate() for account in page["Accounts"]
     ]
     return dict([(f'{account["DisplayName"]} ({account["Id"]})', account) for account in accounts])
 
